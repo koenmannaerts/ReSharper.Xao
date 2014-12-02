@@ -17,13 +17,13 @@ namespace ReSharper.Xao
     [RelatedFilesProvider(typeof(KnownProjectFileType))]
     public class ViewModelRelatedFilesProvider : IRelatedFilesProvider
     {
-        private static readonly string[] ViewSuffixes = { "View", "Flyout", "UserControl", "Page" };
+        private static readonly string[] ViewSuffixes = { "View", "Flyout", "UserControl", "Page", "ViewModel", "Test" };
 
         public IEnumerable<JetTuple<IProjectFile, string, IProjectFile>> GetRelatedFiles(IProjectFile projectFile)
         {
             var typeNamesInFile = GetTypeNamesDefinedInFile(projectFile).ToList();
 
-            var candidateTypeNames = GetTypeCandidates(typeNamesInFile);
+            var candidateTypeNames = GetTypeCandidates(typeNamesInFile, ViewSuffixes);
 
             // Look for the candidate types throught the solution.
             var solution = projectFile.GetSolution();
@@ -68,48 +68,69 @@ namespace ReSharper.Xao
             return rval;
         }
 
-        private IEnumerable<string> GetTypeCandidates(IEnumerable<string> typeNamesInFile)
+        public static IEnumerable<string> GetTypeCandidates(IEnumerable<string> typeNamesInFile, IEnumerable<string> suffixes)
         {
             var candidates = new List<string>();
+            var orderedEnumerable = suffixes.OrderByDescending(x => x.Length).ToList();
 
-            // For each type name in the file, create a list of candidates.
             foreach (var typeName in typeNamesInFile)
             {
-                // If a view model...
-                if (typeName.EndsWith("ViewModel", StringComparison.OrdinalIgnoreCase))
-                {
-                    // Remove ViewModel from end and add all the possible suffixes.
-                    var baseName = typeName.Substring(0, typeName.Length - 9);
-                    foreach (var suffix in ViewSuffixes)
-                    {
-                        var candidate = baseName + suffix;
-                        candidates.Add(candidate);
-                    }
-
-                    // Add base if it ends in one of the view suffixes.
-                    foreach (var suffix in ViewSuffixes)
-                        if (baseName.EndsWith(suffix, StringComparison.OrdinalIgnoreCase))
-                        {
-                            candidates.Add(baseName);
-                            break;
-                        }
-                }
-
-                foreach (var suffix in ViewSuffixes)
+                var suffixesToAdd = orderedEnumerable.Select(x => x).ToList();
+                foreach (var suffix in orderedEnumerable)
                 {
                     if (typeName.EndsWith(suffix))
                     {
-                        // Remove suffix and add ViewModel.
-                        var baseName = typeName.Substring(0, typeName.Length - suffix.Length);
-                        var candidate = baseName + "ViewModel";
-                        candidates.Add(candidate);
-
-                        // Just add ViewModel
-                        candidate = typeName + "ViewModel";
-                        candidates.Add(candidate);
+                        suffixesToAdd.Remove(suffix);
+                        string trim = typeName.Substring(0, typeName.LastIndexOf(suffix));
+                        foreach (var suffixToAdd in suffixesToAdd)
+                        {
+                            candidates.Add(trim + suffixToAdd);
+                        }    
                     }
+                    
                 }
+                
             }
+            
+
+            //// For each type name in the file, create a list of candidates.
+            //foreach (var typeName in typeNamesInFile)
+            //{
+            //    // If a view model...
+            //    if (typeName.EndsWith("ViewModel", StringComparison.OrdinalIgnoreCase))
+            //    {
+            //        // Remove ViewModel from end and add all the possible suffixes.
+            //        var baseName = typeName.Substring(0, typeName.Length - 9);
+            //        foreach (var suffix in ViewSuffixes)
+            //        {
+            //            var candidate = baseName + suffix;
+            //            candidates.Add(candidate);
+            //        }
+
+            //        // Add base if it ends in one of the view suffixes.
+            //        foreach (var suffix in ViewSuffixes)
+            //            if (baseName.EndsWith(suffix, StringComparison.OrdinalIgnoreCase))
+            //            {
+            //                candidates.Add(baseName);
+            //                break;
+            //            }
+            //    }
+
+            //    foreach (var suffix in ViewSuffixes)
+            //    {
+            //        if (typeName.EndsWith(suffix))
+            //        {
+            //            // Remove suffix and add ViewModel.
+            //            var baseName = typeName.Substring(0, typeName.Length - suffix.Length);
+            //            var candidate = baseName + "ViewModel";
+            //            candidates.Add(candidate);
+
+            //            // Just add ViewModel
+            //            candidate = typeName + "ViewModel";
+            //            candidates.Add(candidate);
+            //        }
+            //    }
+            //}
 
             return candidates;
         }
